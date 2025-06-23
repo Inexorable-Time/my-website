@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Send Telegram Message</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            text-align: center;
+        }
+        input[type="text"] {
+            width: 80%;
+            padding: 10px;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #status {
+            margin-top: 20px;
+            color: green;
+        }
+        #status.error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>Send Message to Telegram Channel</h1>
+    <input type="text" id="messageInput" placeholder="Enter your message" autocomplete="off">
+    <br>
+    <button onclick="sendMessage()">Send</button>
+    <div id="status"></div>
+
+    <script>
+        // Function to send message to backend
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const status = document.getElementById('status');
+            const text = input.value.trim();
+
+            if (!text) {
+                status.textContent = 'Please enter a message';
+                status.classList.add('error');
+                return;
+            }
+
+            status.textContent = 'Sending...';
+            status.classList.remove('error');
+
+            try {
+                const response = await fetch('/send-message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: text }),
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    status.textContent = result.message;
+                    input.value = ''; // Clear input
+                } else {
+                    status.textContent = result.detail || 'Failed to send message';
+                    status.classList.add('error');
+                }
+            } catch (error) {
+                status.textContent = 'Error: ' + error.message;
+                status.classList.add('error');
+            }
+        }
+
+        // Allow sending message by pressing Enter
+        document.getElementById('messageInput').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
