@@ -16,12 +16,12 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Telegram bot setup
-BOT_TOKEN = os.getenv('BOT_TOKEN')
-CHANNEL_ID = os.getenv('CHANNEL_ID')
+BOT_TOKEN = os.getenv('8135097014:AAHpEGrsDhbwK9-_MSzfz4ojXIvWuEAqZ2A')
+CHANNEL_ID = os.getenv('-1002875532157')
 
 # Solana setup
-SOLANA_RPC_URL = os.getenv('SOLANA_RPC_URL')
-TOKEN_MINT_ADDRESS = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'  # USDC
+SOLANA_RPC_URL = os.getenv('https://mainnet.helius-rpc.com/?api-key=f220866e-b5d1-4140-a2d5-f48fcd1a506a')
+TOKEN_MINT_ADDRESS = '5rXSxYoRxASFrALkhHX2PG4D96J8L24c7DB3qEzRpump'  # USDC
 MIN_TOKENS = 2000000000000  # 2 million USDC (6 decimals)
 
 async def get_token_balance(wallet_address: str):
