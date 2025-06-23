@@ -66,7 +66,7 @@
         const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKpfDzkvP9');
         const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
 
-        // Custom function to get the associated token address
+        // Get the associated token address
         async function getAssociatedTokenAddress(mint, owner) {
             const [ata] = await PublicKey.findProgramAddress(
                 [
@@ -79,33 +79,34 @@
             return ata;
         }
 
-        // Custom function to get the token balance
+        // Get the token balance
         async function getTokenBalance(connection, associatedTokenAddress) {
             try {
                 const accountInfo = await connection.getAccountInfo(associatedTokenAddress);
-                if (!accountInfo) return 0;
-                const data = accountInfo.data;
-                if (data.length < 72) return 0;
-                const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-                const amount = view.getBigUint64(64, true); // little-endian
-                return Number(amount);
+                if (!accountInfo) return 0n; // Account doesn’t exist
+                const data = accountInfo.data; // Uint8Array in browser
+                if (data.length < 72) return 0n; // Invalid token account
+                const view = new DataView(data.buffer, 0, data.length);
+                const amount = view.getBigUint64(64, true); // Little-endian, offset 64 for SPL token balance
+                return amount; // Returns BigInt
             } catch (error) {
                 console.error('Error fetching token balance:', error);
-                return 0;
+                return 0n;
             }
         }
 
+        // DOM elements
         const connectWalletButton = document.getElementById('connectWallet');
         const walletMessage = document.getElementById('walletMessage');
         const messageForm = document.getElementById('messageForm');
         const statusDiv = document.getElementById('status');
 
-        // Token details (replace with your token's details)
+        // Token configuration
         const tokenMintAddress = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // USDC on Solana
-        const minTokens = '2000000000000'; // 2 million USDC (6 decimals)
+        const minTokens = '2000000000000'; // 2 million USDC (considering 6 decimals)
         const tokenDecimals = 6;
 
-        // Helius RPC endpoint
+        // Helius RPC connection
         const connection = new Connection('https://mainnet.helius-rpc.com/?api-key=f220866e-b5d1-4140-a2d5-f48fcd1a506a', 'confirmed');
 
         async function connectWallet() {
@@ -119,7 +120,7 @@
                 // Connect to Phantom wallet
                 await window.solana.connect();
                 const publicKey = window.solana.publicKey.toString();
- Headlines                walletMessage.textContent = `Connected: ${publicKey.slice(0, 6)}...${publicKey.slice(-4)}`;
+                walletMessage.textContent = `Connected: ${publicKey.slice(0, 6)}...${publicKey.slice(-4)}`;
 
                 // Get associated token account
                 const tokenMint = new PublicKey(tokenMintAddress);
@@ -128,16 +129,16 @@
 
                 // Check token balance
                 const balance = await getTokenBalance(connection, associatedTokenAddress);
-                const minTokensNum = Number(minTokens);
-                const balanceFormatted = (balance / Math.pow(10, tokenDecimals)).toFixed(2);
+                const minTokensBigInt = BigInt(minTokens);
+                const balanceFormatted = (Number(balance) / Math.pow(10, tokenDecimals)).toFixed(2);
 
-                if (balance >= minTokensNum) {
+                if (balance >= minTokensBigInt) {
                     walletMessage.textContent += ` | Holding ${balanceFormatted} tokens ✓`;
                     walletMessage.style.color = 'green';
                     connectWalletButton.style.display = 'none';
                     messageForm.style.display = 'block';
                 } else {
-                    walletMessage.textContent += ` | Insufficient tokens: ${balanceFormatted} (Need ${(minTokensNum / Math.pow(10, tokenDecimals)).toFixed(2)})`;
+                    walletMessage.textContent += ` | Insufficient tokens: ${balanceFormatted} (Need ${(Number(minTokensBigInt) / Math.pow(10, tokenDecimals)).toFixed(2)})`;
                     walletMessage.style.color = 'red';
                 }
             } catch (error) {
@@ -163,7 +164,6 @@
             statusDiv.classList.remove('error');
 
             try {
-                // Get user address
                 await window.solana.connect();
                 const userAddress = window.solana.publicKey.toString();
 
