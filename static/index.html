@@ -57,13 +57,43 @@
         <div id="status"></div>
     </div>
 
-    <!-- Load Solana Web3.js and SPL Token from CDN -->
-    <!-- Replace unpkg.com with cdn.jsdelivr.net -->
-<script src="https://unpkg.com/@solana/web3.js@1.98.2/lib/index.iife.min.js"></script>
-<script src="/static/spl-token.iife.js"></script>
+    <!-- Load Solana Web3.js from CDN -->
+    <script src="https://unpkg.com/@solana/web3.js@1.98.2/lib/index.iife.min.js"></script>
     <script>
         const { Connection, PublicKey } = solanaWeb3;
-        const { getAssociatedTokenAddress, getAccount } = splToken;
+
+        // Program IDs for SPL Token operations
+        const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKpfDzkvP9');
+        const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+
+        // Custom function to get the associated token address
+        async function getAssociatedTokenAddress(mint, owner) {
+            const [ata] = await PublicKey.findProgramAddress(
+                [
+                    owner.toBuffer(),
+                    TOKEN_PROGRAM_ID.toBuffer(),
+                    mint.toBuffer(),
+                ],
+                ASSOCIATED_TOKEN_PROGRAM_ID
+            );
+            return ata;
+        }
+
+        // Custom function to get the token balance
+        async function getTokenBalance(connection, associatedTokenAddress) {
+            try {
+                const accountInfo = await connection.getAccountInfo(associatedTokenAddress);
+                if (!accountInfo) return 0;
+                const data = accountInfo.data;
+                if (data.length < 72) return 0;
+                const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+                const amount = view.getBigUint64(64, true); // little-endian
+                return Number(amount);
+            } catch (error) {
+                console.error('Error fetching token balance:', error);
+                return 0;
+            }
+        }
 
         const connectWalletButton = document.getElementById('connectWallet');
         const walletMessage = document.getElementById('walletMessage');
@@ -89,7 +119,7 @@
                 // Connect to Phantom wallet
                 await window.solana.connect();
                 const publicKey = window.solana.publicKey.toString();
-                walletMessage.textContent = `Connected: ${publicKey.slice(0, 6)}...${publicKey.slice(-4)}`;
+ Headlines                walletMessage.textContent = `Connected: ${publicKey.slice(0, 6)}...${publicKey.slice(-4)}`;
 
                 // Get associated token account
                 const tokenMint = new PublicKey(tokenMintAddress);
@@ -97,22 +127,17 @@
                 const associatedTokenAddress = await getAssociatedTokenAddress(tokenMint, walletPubkey);
 
                 // Check token balance
-                try {
-                    const accountInfo = await getAccount(connection, associatedTokenAddress);
-                    const balance = accountInfo.amount.toString();
-                    const balanceFormatted = (Number(balance) / Math.pow(10, tokenDecimals)).toFixed(2);
+                const balance = await getTokenBalance(connection, associatedTokenAddress);
+                const minTokensNum = Number(minTokens);
+                const balanceFormatted = (balance / Math.pow(10, tokenDecimals)).toFixed(2);
 
-                    if (balance >= minTokens) {
-                        walletMessage.textContent += ` | Holding ${balanceFormatted} tokens ✓`;
-                        walletMessage.style.color = 'green';
-                        connectWalletButton.style.display = 'none';
-                        messageForm.style.display = 'block';
-                    } else {
-                        walletMessage.textContent += ` | Insufficient tokens: ${balanceFormatted} (Need ${minTokens / Math.pow(10, tokenDecimals)})`;
-                        walletMessage.style.color = 'red';
-                    }
-                } catch (error) {
-                    walletMessage.textContent += ` | No tokens found for this wallet`;
+                if (balance >= minTokensNum) {
+                    walletMessage.textContent += ` | Holding ${balanceFormatted} tokens ✓`;
+                    walletMessage.style.color = 'green';
+                    connectWalletButton.style.display = 'none';
+                    messageForm.style.display = 'block';
+                } else {
+                    walletMessage.textContent += ` | Insufficient tokens: ${balanceFormatted} (Need ${(minTokensNum / Math.pow(10, tokenDecimals)).toFixed(2)})`;
                     walletMessage.style.color = 'red';
                 }
             } catch (error) {
@@ -124,46 +149,46 @@
         connectWalletButton.addEventListener('click', connectWallet);
 
         async function sendMessage() {
-    const input = document.getElementById('messageInput');
-    const statusDiv = document.getElementById('status');
-    const text = input.value.trim();
+            const input = document.getElementById('messageInput');
+            const statusDiv = document.getElementById('status');
+            const text = input.value.trim();
 
-    if (!text) {
-        statusDiv.textContent = 'Please enter a message';
-        statusDiv.classList.add('error');
-        return;
-    }
+            if (!text) {
+                statusDiv.textContent = 'Please enter a message';
+                statusDiv.classList.add('error');
+                return;
+            }
 
-    statusDiv.textContent = 'Sending...';
-    statusDiv.classList.remove('error');
+            statusDiv.textContent = 'Sending...';
+            statusDiv.classList.remove('error');
 
-    try {
-        // Get user address
-        await window.solana.connect();
-        const userAddress = window.solana.publicKey.toString();
+            try {
+                // Get user address
+                await window.solana.connect();
+                const userAddress = window.solana.publicKey.toString();
 
-        const response = await fetch('/send-message', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-User-Address': userAddress
-            },
-            body: JSON.stringify({ text: text }),
-        });
+                const response = await fetch('/send-message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User-Address': userAddress
+                    },
+                    body: JSON.stringify({ text: text }),
+                });
 
-        const result = await response.json();
-        if (response.ok) {
-            statusDiv.textContent = result.message;
-            input.value = '';
-        } else {
-            statusDiv.textContent = result.detail || 'Failed to send message';
-            statusDiv.classList.add('error');
+                const result = await response.json();
+                if (response.ok) {
+                    statusDiv.textContent = result.message;
+                    input.value = '';
+                } else {
+                    statusDiv.textContent = result.detail || 'Failed to send message';
+                    statusDiv.classList.add('error');
+                }
+            } catch (error) {
+                statusDiv.textContent = 'Error: ' + error.message;
+                statusDiv.classList.add('error');
+            }
         }
-    } catch (error) {
-        statusDiv.textContent = 'Error: ' + error.message;
-        statusDiv.classList.add('error');
-    }
-}
 
         document.getElementById('messageInput').addEventListener('keypress', function(event) {
             if (event.key === 'Enter') {
