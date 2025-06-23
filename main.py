@@ -29,8 +29,8 @@ async def get_index():
 @app.post("/send-message")
 async def send_message(message: Message):
     try:
-        bot = Bot(token=8135097014:AAHpEGrsDhbwK9-_MSzfz4ojXIvWuEAqZ2A)
-        await bot.send_message(chat_id=-1002875532157, text=message.text)
+        bot = Bot(token=BOT_TOKEN)
+        await bot.send_message(chat_id=CHANNEL_ID, text=message.text)
         return {"status": "success", "message": "Message sent to Telegram"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to send message: {str(e)}")
