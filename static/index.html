@@ -36,55 +36,134 @@
         #status.error {
             color: red;
         }
+        #walletStatus {
+            margin-top: 20px;
+        }
+        #messageForm {
+            display: none;
+        }
     </style>
 </head>
 <body>
     <h1>Send Message to Telegram Channel</h1>
-    <input type="text" id="messageInput" placeholder="Enter your message" autocomplete="off">
-    <br>
-    <button onclick="sendMessage()">Send</button>
-    <div id="status"></div>
+    <div id="walletStatus">
+        <button id="connectWallet">Connect Phantom Wallet</button>
+        <p id="walletMessage">Please connect your Phantom wallet to verify token holdings.</p>
+    </div>
+    <div id="messageForm">
+        <input type="text" id="messageInput" placeholder="Enter your message" autocomplete="off">
+        <br>
+        <button onclick="sendMessage()">Send</button>
+        <div id="status"></div>
+    </div>
 
+    <!-- Load Solana Web3.js and SPL Token from CDN -->
+    <script src="https://unpkg.com/@solana/web3.js@1.95.3/dist/index.iife.min.js"></script>
+    <script src="https://unpkg.com/@solana/spl-token@0.4.8/dist/index.iife.min.js"></script>
     <script>
-        // Function to send message to backend
-        async function sendMessage() {
-            const input = document.getElementById('messageInput');
-            const status = document.getElementById('status');
-            const text = input.value.trim();
+        const { Connection, PublicKey } = solanaWeb3;
+        const { getAssociatedTokenAddress, getAccount } = splToken;
 
-            if (!text) {
-                status.textContent = 'Please enter a message';
-                status.classList.add('error');
+        const connectWalletButton = document.getElementById('connectWallet');
+        const walletMessage = document.getElementById('walletMessage');
+        const messageForm = document.getElementById('messageForm');
+        const statusDiv = document.getElementById('status');
+
+        // Token details (replace with your token's details)
+        const tokenMintAddress = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // USDC on Solana
+        const minTokens = '2000000000000'; // 2 million USDC (6 decimals)
+        const tokenDecimals = 6;
+
+        // Helius RPC endpoint
+        const connection = new Connection('https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY', 'confirmed');
+
+        async function connectWallet() {
+            if (!window.solana || !window.solana.isPhantom) {
+                walletMessage.textContent = 'Please install Phantom wallet!';
+                walletMessage.style.color = 'red';
                 return;
             }
 
-            status.textContent = 'Sending...';
-            status.classList.remove('error');
-
             try {
-                const response = await fetch('/send-message', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ text: text }),
-                });
+                // Connect to Phantom wallet
+                await window.solana.connect();
+                const publicKey = window.solana.publicKey.toString();
+                walletMessage.textContent = `Connected: ${publicKey.slice(0, 6)}...${publicKey.slice(-4)}`;
 
-                const result = await response.json();
-                if (response.ok) {
-                    status.textContent = result.message;
-                    input.value = ''; // Clear input
-                } else {
-                    status.textContent = result.detail || 'Failed to send message';
-                    status.classList.add('error');
+                // Get associated token account
+                const tokenMint = new PublicKey(tokenMintAddress);
+                const walletPubkey = new PublicKey(publicKey);
+                const associatedTokenAddress = await getAssociatedTokenAddress(tokenMint, walletPubkey);
+
+                // Check token balance
+                try {
+                    const accountInfo = await getAccount(connection, associatedTokenAddress);
+                    const balance = accountInfo.amount.toString();
+                    const balanceFormatted = (Number(balance) / Math.pow(10, tokenDecimals)).toFixed(2);
+
+                    if (balance >= minTokens) {
+                        walletMessage.textContent += ` | Holding ${balanceFormatted} tokens ✓`;
+                        walletMessage.style.color = 'green';
+                        connectWalletButton.style.display = 'none';
+                        messageForm.style.display = 'block';
+                    } else {
+                        walletMessage.textContent += ` | Insufficient tokens: ${balanceFormatted} (Need ${minTokens / Math.pow(10, tokenDecimals)})`;
+                        walletMessage.style.color = 'red';
+                    }
+                } catch (error) {
+                    walletMessage.textContent += ` | No tokens found for this wallet`;
+                    walletMessage.style.color = 'red';
                 }
             } catch (error) {
-                status.textContent = 'Error: ' + error.message;
-                status.classList.add('error');
+                walletMessage.textContent = `Error: ${error.message}`;
+                walletMessage.style.color = 'red';
             }
         }
 
-        // Allow sending message by pressing Enter
+        connectWalletButton.addEventListener('click', connectWallet);
+
+        async function sendMessage() {
+    const input = document.getElementById('messageInput');
+    const statusDiv = document.getElementById('status');
+    const text = input.value.trim();
+
+    if (!text) {
+        statusDiv.textContent = 'Please enter a message';
+        statusDiv.classList.add('error');
+        return;
+    }
+
+    statusDiv.textContent = 'Sending...';
+    statusDiv.classList.remove('error');
+
+    try {
+        // Get user address
+        await window.solana.connect();
+        const userAddress = window.solana.publicKey.toString();
+
+        const response = await fetch('/send-message', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-Address': userAddress
+            },
+            body: JSON.stringify({ text: text }),
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            statusDiv.textContent = result.message;
+            input.value = '';
+        } else {
+            statusDiv.textContent = result.detail || 'Failed to send message';
+            statusDiv.classList.add('error');
+        }
+    } catch (error) {
+        statusDiv.textContent = 'Error: ' + error.message;
+        statusDiv.classList.add('error');
+    }
+}
+
         document.getElementById('messageInput').addEventListener('keypress', function(event) {
             if (event.key === 'Enter') {
                 sendMessage();
