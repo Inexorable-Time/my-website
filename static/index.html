@@ -119,12 +119,23 @@
             try {
                 // Connect to Phantom wallet
                 await window.solana.connect();
-                const publicKey = window.solana.publicKey.toString();
-                walletMessage.textContent = `Connected: ${publicKey.slice(0, 6)}...${publicKey.slice(-4)}`;
+                const walletPubkey = window.solana.publicKey;
+                if (!walletPubkey) {
+                    throw new Error('Public key not found after connecting');
+                }
+                const publicKeyStr = walletPubkey.toString();
+                walletMessage.textContent = `Connected: ${publicKeyStr.slice(0, 6)}...${publicKeyStr.slice(-4)}`;
+
+                // Verify and create tokenMint PublicKey
+                let tokenMint;
+                try {
+                    console.log('Token Mint Address:', tokenMintAddress);
+                    tokenMint = new PublicKey(tokenMintAddress);
+                } catch (error) {
+                    throw new Error('Invalid token mint address: ' + error.message);
+                }
 
                 // Get associated token account
-                const tokenMint = new PublicKey(tokenMintAddress);
-                const walletPubkey = new PublicKey(publicKey);
                 const associatedTokenAddress = await getAssociatedTokenAddress(tokenMint, walletPubkey);
 
                 // Check token balance
@@ -144,6 +155,7 @@
             } catch (error) {
                 walletMessage.textContent = `Error: ${error.message}`;
                 walletMessage.style.color = 'red';
+                console.error('Connect Wallet Error:', error);
             }
         }
 
@@ -164,7 +176,9 @@
             statusDiv.classList.remove('error');
 
             try {
-                await window.solana.connect();
+                if (!window.solana || !window.solana.publicKey) {
+                    throw new Error('Wallet not connected');
+                }
                 const userAddress = window.solana.publicKey.toString();
 
                 const response = await fetch('/send-message', {
